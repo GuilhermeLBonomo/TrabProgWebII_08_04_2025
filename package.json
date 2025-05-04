@@ -29,5 +29,13 @@
     "sequelize": "^6.6.5",
     "sequelize-typescript": "^2.1.0",
     "uuidv4": "^6.2.12"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GuilhermeLBonomo/TrabProgWebII_08_04_2025.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GuilhermeLBonomo/TrabProgWebII_08_04_2025/issues"
+  },
+  "homepage": "https://github.com/GuilhermeLBonomo/TrabProgWebII_08_04_2025#readme"
 }

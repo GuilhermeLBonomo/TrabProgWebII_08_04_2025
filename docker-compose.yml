@@ -1,5 +1,4 @@
-version: "3.3"
-
+# @format
 services:
   mysql:
     container_name: swm-mysql
@@ -13,9 +12,9 @@ services:
       - ./volumes/mysql:/var/lib/mysql
     environment:
       MYSQL_ROOT_PASSWORD: RootPasswordGiovani!
-      MYSQL_DATABASE: swm_database # Opcional: cria um banco de dados inicial
-      MYSQL_USER: swm_user # Opcional: cria um usuário específico
-      MYSQL_PASSWORD: senha # Opcional: senha para o usuário específico
+      MYSQL_DATABASE: swm_database
+      MYSQL_USER: swm_user
+      MYSQL_PASSWORD: senha
 
   rabbit:
     container_name: swm-rabbit
