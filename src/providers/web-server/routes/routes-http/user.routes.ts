@@ -1,5 +1,3 @@
-/** @format */
-
 import express, { Request, Response } from "express";
 import { sendCreateUserController } from "../../../../app/send-create-user";
 import { IRouterHttp } from "../routes";

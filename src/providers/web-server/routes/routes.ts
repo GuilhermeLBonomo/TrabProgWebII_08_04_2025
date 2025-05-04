@@ -1,5 +1,3 @@
-/** @format */
-
 import express from "express";
 import { UserRouter } from "./routes-http/user.routes";
 

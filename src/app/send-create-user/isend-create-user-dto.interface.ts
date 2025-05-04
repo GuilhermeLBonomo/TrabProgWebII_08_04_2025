@@ -1,5 +1,3 @@
-/** @format */
-
 export interface ISendCreateUserDTO {
   name: string;
   email: string;

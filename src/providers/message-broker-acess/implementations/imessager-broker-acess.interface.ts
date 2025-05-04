@@ -1,5 +1,3 @@
-/** @format */
-
 export interface IMessagerAccess {
   queue: string;
   message: any;

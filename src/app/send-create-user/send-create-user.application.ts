@@ -1,5 +1,3 @@
-/** @format */
-
 import { IMessagerBrokerAccess } from "../../providers/message-broker-acess/implementations/imessager-broker-acess.interface";
 import { ISendCreateUserDTO } from "./isend-create-user-dto.interface";
 export class SendCreateUserApplication {
