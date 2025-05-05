@@ -9,7 +9,15 @@ export class UserRouter implements IRouterHttp {
    */
   handle(router: express.Router): void {
     router.post("/users", async (req: Request, resp: Response) => {
-      return sendCreateUserController.handle(req, resp);
+      try {
+        return await sendCreateUserController.handle(req, resp);
+      } catch (error) {
+        console.error("Error creating user:", error);
+        resp.status(500).json({
+          message: "Internal Server Error",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     });
   }
 }

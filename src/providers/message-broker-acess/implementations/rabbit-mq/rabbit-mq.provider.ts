@@ -1,7 +1,5 @@
-/** @format */
-
 import dotenv from "dotenv";
-import amqp from "amqplib";
+import amqp, { Channel, Connection } from "amqplib";
 import { v4 as uuidv4 } from "uuid";
 import {
   IMessagerAccess,
@@ -13,28 +11,38 @@ import {
 dotenv.config();
 
 export class RabbitMQ implements IMessagerBrokerAccess {
+  sendPubSub(message: IMessagerAccess): Promise<any> {
+    throw new Error("Method not implemented.");
+  }
   private readonly URL: string =
     process.env.RABBITMQ_URL ?? "amqp://guest:guest@localhost:5672";
 
-  /**
-   * Connect with messager broker
-   */
-  async connect(): Promise<any> {
-    return amqp.connect(this.URL).then((conn) => conn.createChannel());
+  async connect(): Promise<Channel> {
+    try {
+      const conn: Connection = await amqp.connect(this.URL);
+      return conn.createChannel();
+    } catch (err) {
+      console.error("Error connecting to RabbitMQ:", err);
+      throw err;
+    }
   }
 
-  /**
-   * Listen RPC
-   * @param queue
-   * @param callback
-   */
+  async createQueue(channel: Channel, queue: string): Promise<Channel> {
+    try {
+      await channel.assertQueue(queue, { durable: true });
+      return channel;
+    } catch (err) {
+      console.error("Error creating queue:", err);
+      throw err;
+    }
+  }
+
   listenRPC(queue: string, callback: CallableFunction): void {
     this.connect()
       .then((channel) => this.createQueue(channel, queue))
       .then((ch) => {
         ch.consume(queue, async (msg) => {
           if (!msg) return;
-
           try {
             const request = this.messageConvertRequest(msg);
             const response = await callback(request);
@@ -54,41 +62,6 @@ export class RabbitMQ implements IMessagerBrokerAccess {
       .catch((err) => console.error("Error in listenRPC:", err));
   }
 
-  /**
-   * Create
-   * @param channel
-   * @param queue
-   */
-  async createQueue(
-    channel: amqp.Channel,
-    queue: string
-  ): Promise<amqp.Channel> {
-    await channel.assertQueue(queue, { durable: true });
-    return channel;
-  }
-
-  /**
-   * Send Pub/Sub
-   * @param queue
-   */
-  async sendPubSub(message: IMessagerAccess): Promise<void> {
-    try {
-      const channel = await this.connect().then((ch) =>
-        this.createQueue(ch, message.queue)
-      );
-      channel.sendToQueue(
-        message.queue,
-        Buffer.from(JSON.stringify(message.message))
-      );
-    } catch (err) {
-      console.error("Error in sendPubSub:", err);
-    }
-  }
-
-  /**
-   * Send RPC
-   * @param message
-   */
   async sendRPC(message: IMessagerAccess): Promise<IResponseAccessResponse> {
     const timeout = Number(process.env.RABBITMQ_TIMEOUT) || 5000;
     const corr = uuidv4();
@@ -134,40 +107,21 @@ export class RabbitMQ implements IMessagerBrokerAccess {
     });
   }
 
-  /**
-   * Convert Message
-   * @param message
-   * @returns
-   */
   messageConvert(message: { content: Buffer }): IResponseAccessResponse {
     try {
       const parsed = JSON.parse(message.content.toString());
-
       return {
         code: typeof parsed.code === "number" ? parsed.code : 200,
         response: parsed,
       };
     } catch (error) {
-      return {
-        code: 500,
-        response: {
-          message: "Invalid JSON format",
-          raw: message.content.toString(),
-          error: error instanceof Error ? error.message : String(error),
-        },
-      };
+      return this.createErrorResponse("Invalid JSON format", error);
     }
   }
 
-  /**
-   * Message Convert Request
-   * @param message
-   * @returns
-   */
   messageConvertRequest(message: { content: Buffer }): IMessagerAccessRequest {
     try {
       const parsed = JSON.parse(message.content.toString());
-
       return {
         body: parsed,
         message: "Parsed successfully",
@@ -175,7 +129,6 @@ export class RabbitMQ implements IMessagerBrokerAccess {
     } catch (error) {
       const errorMsg =
         error instanceof Error ? error.message : "Unknown parsing error";
-
       return {
         body: null,
         message: `Invalid JSON (${errorMsg}): ${message.content.toString()}`,
@@ -183,13 +136,6 @@ export class RabbitMQ implements IMessagerBrokerAccess {
     }
   }
 
-  /**
-   * Response RPC
-   * @param replyTo
-   * @param correlationId
-   * @param response
-   * @returns
-   */
   async responseCallRPC(objResponse: {
     queue: string;
     replyTo: string;
@@ -208,5 +154,18 @@ export class RabbitMQ implements IMessagerBrokerAccess {
     } catch (err) {
       console.error("Error in responseCallRPC:", err);
     }
+  }
+
+  private createErrorResponse(
+    message: string,
+    error: any
+  ): IResponseAccessResponse {
+    return {
+      code: 500,
+      response: {
+        message,
+        error: error instanceof Error ? error.stack : String(error),
+      },
+    };
   }
 }
