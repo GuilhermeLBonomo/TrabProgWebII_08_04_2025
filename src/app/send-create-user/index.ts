@@ -10,4 +10,4 @@ const sendCreateUserController = new SendCreateUserController(
 
 export { sendCreateUserApp, sendCreateUserController };
 
-//curl --request POST --url 'http://localhost:3000/user' --header 'Content-Type: application/json' --data '{"name": "User Teste", "email": "email@teste.com", "password": "senha_fraca", "cellPhone": "+55999999999"}'
+// curl -X POST http://localhost:3000/api/users -H "Content-Type: application/json" -d '{"name":"Alice","email":"alice@example.com","password":"secure123","cellPhone":"1234567890"}'

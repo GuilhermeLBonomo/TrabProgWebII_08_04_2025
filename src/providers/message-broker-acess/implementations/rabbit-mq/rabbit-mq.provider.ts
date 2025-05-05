@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import amqp, { Channel, Connection } from "amqplib";
+import amqp, { Channel, Connection, ConsumeMessage } from "amqplib";
 import { v4 as uuidv4 } from "uuid";
 import {
   IMessagerAccess,
@@ -7,22 +7,51 @@ import {
   IMessagerBrokerAccess,
   IResponseAccessResponse,
 } from "../imessager-broker-acess.interface";
-
+//Gateway
 dotenv.config();
 
 export class RabbitMQ implements IMessagerBrokerAccess {
-  sendPubSub(message: IMessagerAccess): Promise<any> {
-    throw new Error("Method not implemented.");
+  private readonly URL: string;
+
+  constructor() {
+    const user = process.env.RABBIT_USER;
+    const pass = process.env.RABBIT_PASSWORD;
+    const host = process.env.RABBIT_HOST;
+    const port = process.env.RABBIT_PORT;
+
+    if (!user || !pass || !host || !port) {
+      throw new Error(
+        "Variáveis de ambiente do RabbitMQ ausentes. Verifique RABBIT_USER, RABBIT_PASSWORD, RABBIT_HOST e RABBIT_PORT."
+      );
+    }
+
+    this.URL = `amqp://${user}:${pass}@${host}:${port}`;
   }
-  private readonly URL: string =
-    process.env.RABBITMQ_URL ?? "amqp://guest:guest@localhost:5672";
+
+  /**
+   * Envia mensagem por publish/subscribe.
+   * @param message Objeto com fila e conteúdo.
+   */
+  async sendPubSub(message: IMessagerAccess): Promise<void> {
+    try {
+      const channel = await this.connect().then((ch) =>
+        this.createQueue(ch, message.queue)
+      );
+      channel.sendToQueue(
+        message.queue,
+        Buffer.from(JSON.stringify(message.message))
+      );
+    } catch (err) {
+      console.error("Erro ao enviar mensagem Pub/Sub:", err);
+    }
+  }
 
   async connect(): Promise<Channel> {
     try {
       const conn: Connection = await amqp.connect(this.URL);
-      return conn.createChannel();
+      return await conn.createChannel();
     } catch (err) {
-      console.error("Error connecting to RabbitMQ:", err);
+      console.error("Erro ao conectar ao RabbitMQ:", err);
       throw err;
     }
   }
@@ -32,7 +61,7 @@ export class RabbitMQ implements IMessagerBrokerAccess {
       await channel.assertQueue(queue, { durable: true });
       return channel;
     } catch (err) {
-      console.error("Error creating queue:", err);
+      console.error(`Erro criando fila [${queue}]:`, err);
       throw err;
     }
   }
@@ -41,70 +70,86 @@ export class RabbitMQ implements IMessagerBrokerAccess {
     this.connect()
       .then((channel) => this.createQueue(channel, queue))
       .then((ch) => {
-        ch.consume(queue, async (msg) => {
+        ch.consume(queue, async (msg: ConsumeMessage | null) => {
           if (!msg) return;
+
           try {
             const request = this.messageConvertRequest(msg);
             const response = await callback(request);
+
             await this.responseCallRPC({
               queue,
               replyTo: msg.properties.replyTo,
               correlationId: msg.properties.correlationId,
               response,
             });
+
             ch.ack(msg);
           } catch (err) {
-            console.error("Error handling RPC message:", err);
+            console.error("Erro ao processar mensagem RPC:", err);
             ch.nack(msg, false, false);
           }
         });
       })
-      .catch((err) => console.error("Error in listenRPC:", err));
+      .catch((err) => console.error("Erro ao iniciar escuta RPC:", err));
   }
 
   async sendRPC(message: IMessagerAccess): Promise<IResponseAccessResponse> {
-    const timeout = Number(process.env.RABBITMQ_TIMEOUT) || 5000;
-    const corr = uuidv4();
-    const conn = await amqp.connect(this.URL);
-    const ch = await conn.createChannel();
-    await ch.assertQueue(message.queue, { durable: true });
-    const q = await ch.assertQueue("", { exclusive: true });
+    const timeout = Number(process.env.RABBIT_TIMEOUT) || 5000;
+    const correlationId = uuidv4();
 
-    return new Promise((resolve) => {
-      let isResponded = false;
+    try {
+      const conn = await amqp.connect(this.URL);
+      const ch = await conn.createChannel();
 
-      const timer = setTimeout(() => {
-        if (!isResponded) {
-          conn.close();
-          resolve({
-            code: 408,
-            response: { message: "Timeout" },
-          });
-        }
-      }, timeout);
+      await ch.assertQueue(message.queue, { durable: true });
+      const q = await ch.assertQueue("", { exclusive: true });
 
-      ch.consume(
-        q.queue,
-        (msg) => {
-          if (msg?.properties.correlationId === corr) {
-            clearTimeout(timer);
+      return new Promise((resolve, reject) => {
+        let isResponded = false;
+
+        const timer = setTimeout(() => {
+          if (!isResponded) {
             conn.close();
-            isResponded = true;
-            resolve(this.messageConvert(msg));
+            reject(
+              new Error(
+                JSON.stringify({
+                  code: 408,
+                  response: {
+                    message: "Tempo excedido ao aguardar resposta RPC",
+                  },
+                })
+              )
+            );
           }
-        },
-        { noAck: true }
-      );
+        }, timeout);
 
-      ch.sendToQueue(
-        message.queue,
-        Buffer.from(JSON.stringify(message.message)),
-        {
-          correlationId: corr,
-          replyTo: q.queue,
-        }
-      );
-    });
+        ch.consume(
+          q.queue,
+          (msg) => {
+            if (msg?.properties.correlationId === correlationId) {
+              clearTimeout(timer);
+              conn.close();
+              isResponded = true;
+              resolve(this.messageConvert(msg));
+            }
+          },
+          { noAck: true }
+        );
+
+        ch.sendToQueue(
+          message.queue,
+          Buffer.from(JSON.stringify(message.message)),
+          {
+            correlationId,
+            replyTo: q.queue,
+          }
+        );
+      });
+    } catch (err) {
+      console.error("Erro ao enviar mensagem RPC:", err);
+      return this.createErrorResponse("Erro ao enviar mensagem RPC", err);
+    }
   }
 
   messageConvert(message: { content: Buffer }): IResponseAccessResponse {
@@ -115,7 +160,10 @@ export class RabbitMQ implements IMessagerBrokerAccess {
         response: parsed,
       };
     } catch (error) {
-      return this.createErrorResponse("Invalid JSON format", error);
+      return this.createErrorResponse(
+        "Formato JSON inválido na resposta",
+        error
+      );
     }
   }
 
@@ -124,14 +172,16 @@ export class RabbitMQ implements IMessagerBrokerAccess {
       const parsed = JSON.parse(message.content.toString());
       return {
         body: parsed,
-        message: "Parsed successfully",
+        message: "Mensagem parseada com sucesso",
       };
     } catch (error) {
       const errorMsg =
-        error instanceof Error ? error.message : "Unknown parsing error";
+        error instanceof Error
+          ? error.message
+          : "Erro desconhecido ao fazer parse";
       return {
         body: null,
-        message: `Invalid JSON (${errorMsg}): ${message.content.toString()}`,
+        message: `JSON inválido (${errorMsg}): ${message.content.toString()}`,
       };
     }
   }
@@ -152,7 +202,7 @@ export class RabbitMQ implements IMessagerBrokerAccess {
         { correlationId: objResponse.correlationId }
       );
     } catch (err) {
-      console.error("Error in responseCallRPC:", err);
+      console.error("Erro ao enviar resposta RPC:", err);
     }
   }
 
