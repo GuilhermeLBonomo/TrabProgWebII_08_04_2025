@@ -1,0 +1,2 @@
+CREATE DATABASE mms_user;
+GRANT ALL PRIVILEGES ON DATABASE mms_user TO postgres;
