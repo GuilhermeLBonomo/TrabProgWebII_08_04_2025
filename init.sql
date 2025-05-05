@@ -1,9 +1,9 @@
 DO
 $$
 BEGIN
-   IF NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'mms_user') THEN
-      CREATE DATABASE mms_user;
+   IF NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}') THEN
+      CREATE DATABASE ${DB_NAME};
    END IF;
 END
 $$;
-GRANT ALL PRIVILEGES ON DATABASE mms_user TO postgres;
+GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};

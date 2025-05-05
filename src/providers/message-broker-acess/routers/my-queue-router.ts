@@ -11,7 +11,7 @@ export class MyQueueRouter implements IRouterMessageBroker {
   handle(messagerBrokerAccess: RabbitMQ): void {
     const queue = "myQueue";
 
-    messagerBrokerAccess.listenRPC(queue, (request) => {
+    messagerBrokerAccess.listenRPC(queue, (request: any) => {
       console.log("Received message:", request);
       return {
         code: 200,

@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
 import { app } from "./providers/web-server";
-
-app.listen(3000, () => console.log("WebServer is running..."));
+dotenv.config();
+app.listen(process.env.SERVER_PORT, () =>
+  console.log(`Servidor rodando na porta ${process.env.SERVER_PORT} ...`)
+);

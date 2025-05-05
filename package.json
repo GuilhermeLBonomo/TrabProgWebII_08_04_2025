@@ -21,6 +21,7 @@
     "@types/uuidv4": "^5.0.0",
     "amqplib": "^0.8.0",
     "bcrypt": "^5.0.1",
+    "dotenv": "^16.5.0",
     "express": "^4.17.1",
     "install": "^0.13.0",
     "ms-api-gateway": "file:",
