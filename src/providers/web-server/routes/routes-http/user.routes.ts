@@ -8,7 +8,7 @@ export class UserRouter implements IRouterHttp {
    * @param router
    */
   handle(router: express.Router): void {
-    router.post("/user", async (req: Request, resp: Response) => {
+    router.post("/users", async (req: Request, resp: Response) => {
       return sendCreateUserController.handle(req, resp);
     });
   }

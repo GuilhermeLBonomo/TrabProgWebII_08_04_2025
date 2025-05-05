@@ -4,6 +4,6 @@ import { router } from "./routes/routes";
 const app = express();
 
 app.use(express.json());
-app.use(router);
+app.use("/api", router);
 
 export { app };
