@@ -25,10 +25,11 @@
     "express": "^4.17.1",
     "install": "^0.13.0",
     "ms-api-gateway": "file:",
+    "mysql2": "^3.14.1",
     "pg": "^8.7.1",
     "reflect-metadata": "^0.1.13",
-    "sequelize": "^6.6.5",
-    "sequelize-typescript": "^2.1.0",
+    "sequelize": "^6.37.7",
+    "sequelize-typescript": "^2.1.6",
     "uuidv4": "^6.2.12"
   },
   "repository": {

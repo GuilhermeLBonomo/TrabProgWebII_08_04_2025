@@ -1,27 +1,27 @@
 services:
-  postgres:
-    container_name: swm-postgres
+  mysql:
+    container_name: swm-mysql
     restart: always
-    image: postgres
+    image: mysql:5.7
     networks:
       - swmnetwork
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:${DB_PORT}"
     volumes:
-      - ./volumes/postgres:/var/lib/postgresql/data
+      - ./volumes/mysql:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     environment:
-      POSTGRES_PASSWORD: ${DB_PASS}
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
   rabbit:
     container_name: swm-rabbit
     restart: always
     image: rabbitmq:3-management
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "${RABBIT_PORT}:${RABBIT_PORT}"
+      - "${RABBIT_MANAGEMENT_PORT}:${RABBIT_MANAGEMENT_PORT}"
     volumes:
       - ./volumes/rabbit:/data
     networks:
